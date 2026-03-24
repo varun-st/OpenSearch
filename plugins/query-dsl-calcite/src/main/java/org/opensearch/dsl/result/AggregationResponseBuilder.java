@@ -12,6 +12,7 @@ import org.opensearch.dsl.aggregation.AggregationMetadataBuilder;
 import org.opensearch.dsl.aggregation.AggregationRegistry;
 import org.opensearch.dsl.aggregation.AggregationType;
 import org.opensearch.dsl.aggregation.bucket.BucketShape;
+import org.opensearch.dsl.aggregation.metric.CompositeMetricTranslator;
 import org.opensearch.dsl.aggregation.metric.MetricTranslator;
 import org.opensearch.dsl.exception.ConversionException;
 import org.opensearch.search.aggregations.AggregationBuilder;
@@ -35,6 +36,8 @@ import java.util.stream.Collectors;
  * granularity's result, and reconstructs the nested bucket structure.
  */
 public final class AggregationResponseBuilder {
+
+    private static final String GRANULARITY_KEY_DELIMITER = ",";
 
     private final AggregationRegistry registry;
     private final Map<String, ExecutionResult> granularityMap;
@@ -84,8 +87,11 @@ public final class AggregationResponseBuilder {
         for (AggregationBuilder agg : aggs) {
             AggregationType<AggregationBuilder> type = registry.findHandler(agg);
 
-            if (type instanceof MetricTranslator) {
-                result.add(buildMetric((MetricTranslator<AggregationBuilder>) type, agg,
+            if (type instanceof CompositeMetricTranslator) {
+                result.add(buildCompositeMetric((CompositeMetricTranslator<AggregationBuilder>) type, agg,
+                    accumulatedGroupFields, parentKeyFilter));
+            } else if (type instanceof MetricTranslator) {
+                result.add(buildSingleValueMetric((MetricTranslator<AggregationBuilder>) type, agg,
                     accumulatedGroupFields, parentKeyFilter));
             } else if (type instanceof BucketShape) {
                 result.add(buildBucket((BucketShape<AggregationBuilder>) type, agg,
@@ -95,7 +101,7 @@ public final class AggregationResponseBuilder {
         return result;
     }
 
-    private InternalAggregation buildMetric(
+    private InternalAggregation buildSingleValueMetric(
             MetricTranslator<AggregationBuilder> translator,
             AggregationBuilder agg,
             List<String> accumulatedGroupFields,
@@ -108,6 +114,7 @@ public final class AggregationResponseBuilder {
         }
 
         Map<String, Integer> colIndex = buildColumnIndex(result);
+
         String metricFieldName = agg.getName();
         Integer colIdx = colIndex.get(metricFieldName);
         if (colIdx == null) {
@@ -124,6 +131,72 @@ public final class AggregationResponseBuilder {
         Object[] matchingRow = findMatchingRow(result, colIndex, parentKeyFilter);
         Object value = matchingRow != null ? matchingRow[colIdx] : null;
         return translator.toInternalAggregation(agg.getName(), value);
+    }
+
+    private InternalAggregation buildCompositeMetric(
+            CompositeMetricTranslator<AggregationBuilder> translator,
+            AggregationBuilder agg,
+            List<String> accumulatedGroupFields,
+            Map<String, Object> parentKeyFilter) {
+
+        String granularityKey = String.join(GRANULARITY_KEY_DELIMITER, accumulatedGroupFields);
+        ExecutionResult result = granularityMap.get(granularityKey);
+        if (result == null || result.getRows().length == 0) {
+            return translator.buildEmptyAggregation(agg.getName());
+        }
+
+        Map<String, Integer> columnNameToIndex = buildColumnIndex(result);
+        List<String> metricFieldNames = translator.getAggregateFieldNames(agg);
+
+        List<Integer> metricColumnIndices = resolveMetricColumnIndices(metricFieldNames, columnNameToIndex);
+        if (metricColumnIndices == null) {
+            return translator.buildEmptyAggregation(agg.getName());
+        }
+
+        Object[] dataRow;
+        if (accumulatedGroupFields.isEmpty()) {
+            dataRow = result.getRows()[0];
+        } else {
+            dataRow = findMatchingRow(result, columnNameToIndex, parentKeyFilter);
+        }
+
+        if (dataRow == null) {
+            return translator.buildEmptyAggregation(agg.getName());
+        }
+
+        List<Object> metricValues = extractMetricValues(dataRow, metricColumnIndices);
+        if (metricValues == null) {
+            return translator.buildEmptyAggregation(agg.getName());
+        }
+
+        return translator.toInternalAggregation(agg.getName(), metricValues);
+    }
+
+    private List<Integer> resolveMetricColumnIndices(
+            List<String> metricFieldNames,
+            Map<String, Integer> columnNameToIndex) {
+        List<Integer> indices = new ArrayList<>(metricFieldNames.size());
+        for (String fieldName : metricFieldNames) {
+            Integer columnIndex = columnNameToIndex.get(fieldName);
+            if (columnIndex == null) {
+                return null;
+            }
+            indices.add(columnIndex);
+        }
+        return indices;
+    }
+
+    private List<Object> extractMetricValues(
+            Object[] dataRow,
+            List<Integer> metricColumnIndices) {
+        List<Object> values = new ArrayList<>(metricColumnIndices.size());
+        for (Integer columnIndex : metricColumnIndices) {
+            if (columnIndex >= dataRow.length) {
+                return null;
+            }
+            values.add(dataRow[columnIndex]);
+        }
+        return values;
     }
 
     @SuppressWarnings("unchecked")

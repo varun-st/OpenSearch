@@ -64,6 +64,7 @@ dependencies {
     testImplementation "junit:junit:${versions.junit}"
     testImplementation "org.hamcrest:hamcrest:${versions.hamcrest}"
     testImplementation "org.mockito:mockito-core:${versions.mockito}"
+    testImplementation project(':server')
     
     // Integration testing
     internalClusterTestImplementation project(':server')
@@ -133,4 +134,18 @@ missingJavadoc {
         'org.opensearch.dsl.exception',
         'org.opensearch.dsl.mapping'
     ]
+}
+
+
+// TODO: Investigate why standard 'test' task is disabled by opensearch.internal-cluster-test plugin.
+// Either re-enable it properly or move unit tests to internalClusterTest source set to follow
+// OpenSearch plugin conventions. This custom task is a workaround.
+task runUnitTests(type: Test) {
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnit()
+    
+    filter {
+        includeTestsMatching "org.opensearch.dsl.aggregation.metric.*"
+    }
 }
