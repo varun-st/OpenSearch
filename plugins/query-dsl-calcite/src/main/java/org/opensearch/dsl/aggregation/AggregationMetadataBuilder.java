@@ -11,6 +11,7 @@ package org.opensearch.dsl.aggregation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -111,7 +112,8 @@ public class AggregationMetadataBuilder {
         List<AggregateCall> allCalls = new ArrayList<>();
         boolean noGroupBy = groupings.isEmpty();
         for (AggregateCall call : aggregateCalls) {
-            if (noGroupBy) {
+            boolean isCount = call.getAggregation().getKind() == SqlKind.COUNT;
+            if (noGroupBy && !isCount) {
                 RelDataType nullableType = ctx.getTypeFactory()
                     .createTypeWithNullability(call.getType(), true);
                 allCalls.add(AggregateCall.create(
@@ -125,6 +127,10 @@ public class AggregationMetadataBuilder {
         List<String> allFieldNames = new ArrayList<>(aggregateFieldNames);
 
         if (implicitCountRequested) {
+            RelDataType bigIntNotNull = ctx.getTypeFactory().createTypeWithNullability(
+                ctx.getTypeFactory().createSqlType(SqlTypeName.BIGINT),
+                false
+            );
             allCalls.add(AggregateCall.create(
                 SqlStdOperatorTable.COUNT,
                 false,
@@ -133,7 +139,7 @@ public class AggregationMetadataBuilder {
                 List.of(),
                 -1,
                 RelCollations.EMPTY,
-                ctx.getTypeFactory().createSqlType(SqlTypeName.BIGINT),
+                bigIntNotNull,
                 IMPLICIT_COUNT_NAME
             ));
             allFieldNames.add(IMPLICIT_COUNT_NAME);

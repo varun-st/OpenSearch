@@ -8,8 +8,10 @@
 
 package org.opensearch.dsl.aggregation;
 
+import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.type.RelDataType;
 import org.opensearch.dsl.aggregation.bucket.BucketShape;
+import org.opensearch.dsl.aggregation.metric.CompositeMetricTranslator;
 import org.opensearch.dsl.aggregation.metric.MetricTranslator;
 import org.opensearch.dsl.exception.ConversionException;
 import org.opensearch.search.aggregations.AggregationBuilder;
@@ -81,6 +83,9 @@ public class AggregationTreeWalker {
             if (type instanceof BucketShape) {
                 handleBucket((BucketShape<AggregationBuilder>) type,
                     agg, currentGroupings, granularities, ctx);
+            } else if (type instanceof CompositeMetricTranslator) {
+                handleCompositeMetric((CompositeMetricTranslator<AggregationBuilder>) type,
+                    agg, currentGroupings, granularities, ctx);
             } else if (type instanceof MetricTranslator) {
                 handleMetric((MetricTranslator<AggregationBuilder>) type,
                     agg, currentGroupings, granularities, ctx);
@@ -123,8 +128,36 @@ public class AggregationTreeWalker {
         // The builder is created with empty orders since there's no bucket to order by.
         AggregationMetadataBuilder builder = getOrCreateBuilder(
             currentGroupings, List.of(), granularities);
+
         builder.addAggregateCall(translator.toAggregateCall(agg, ctx));
         builder.addAggregateFieldName(translator.getAggregateFieldName(agg));
+    }
+
+    private void handleCompositeMetric(
+            CompositeMetricTranslator<AggregationBuilder> translator,
+            AggregationBuilder agg,
+            List<GroupingInfo> currentGroupings,
+            Map<String, AggregationMetadataBuilder> granularities,
+            AggregationConversionContext ctx) throws ConversionException {
+
+        AggregationMetadataBuilder builder = getOrCreateBuilder(
+            currentGroupings, List.of(), granularities);
+
+        List<AggregateCall> calls = translator.toAggregateCalls(agg, ctx);
+        List<String> fieldNames = translator.getAggregateFieldNames(agg);
+
+        if (calls.size() != fieldNames.size()) {
+            throw new ConversionException(
+                "aggregation",
+                "Mismatch between aggregate calls (" + calls.size() +
+                ") and field names (" + fieldNames.size() + ") for aggregation: " + agg.getName()
+            );
+        }
+
+        for (int i = 0; i < calls.size(); i++) {
+            builder.addAggregateCall(calls.get(i));
+            builder.addAggregateFieldName(fieldNames.get(i));
+        }
     }
 
     private AggregationMetadataBuilder getOrCreateBuilder(

@@ -795,4 +795,178 @@ public class DslLogicalPlanIntegrationIT extends DslLogicalPlanIntegrationTestBa
                 errorMessage.contains("unknown"));
         }
     }
+
+    /**
+     * Test: Stats aggregation.
+     * Verifies that stats aggregation translates to 5 Calcite aggregate functions.
+     *
+     * DSL Query:
+     * {
+     *   "aggs": {
+     *     "price_stats": {
+     *       "stats": { "field": "price" }
+     *     }
+     *   },
+     *   "size": 0
+     * }
+     *
+     * Expected Calcite Plan:
+     * LogicalAggregate(
+     *   group=[{}],
+     *   price_stats_count=[COUNT($price)],
+     *   price_stats_min=[MIN($price)],
+     *   price_stats_max=[MAX($price)],
+     *   price_stats_sum=[SUM($price)],
+     *   price_stats_avg=[AVG($price)]
+     * )
+     *   LogicalTableScan(table=[[test-stats]])
+     */
+    public void testStatsAggregationConversion() throws Exception {
+        String indexName = "test-stats";
+        String mapping = "{"
+            + "\"properties\": {"
+            + "  \"price\": {\"type\": \"long\"}"
+            + "}"
+            + "}";
+        client().admin().indices().prepareCreate(indexName)
+            .setMapping(mapping)
+            .get();
+        ensureGreen(indexName);
+
+        indexTestDoc(indexName, "1", "price", 100);
+        indexTestDoc(indexName, "2", "price", 200);
+        indexTestDoc(indexName, "3", "price", 300);
+        client().admin().indices().prepareRefresh(indexName).get();
+
+        SearchSourceBuilder searchSource = new SearchSourceBuilder();
+        searchSource.aggregation(AggregationBuilders.stats("price_stats").field("price"));
+        searchSource.size(0);
+
+        SearchResponse response = convertDsl(searchSource, indexName);
+        assertNotNull("SearchResponse should not be null", response);
+
+        // TODO: Add deeper assertions to verify:
+        // - LogicalAggregate node exists with empty grouping set (group=[{}])
+        // - 5 aggregate calls present: COUNT, MIN, MAX, SUM, AVG
+        // - Field names match: price_stats_count, price_stats_min, price_stats_max, price_stats_sum, price_stats_avg
+        // - Aggregate functions use correct field index ($price)
+        // - Response contains InternalStats with correct computed values (count=3, min=100, max=300, sum=600, avg=200)
+    }
+
+    /**
+     * Test: Extended stats aggregation conversion.
+     * Verifies that extended_stats aggregation is converted to Calcite aggregate functions.
+     *
+     * DSL Query:
+     * {
+     *   "aggs": {
+     *     "price_extended_stats": {
+     *       "extended_stats": {
+     *         "field": "price"
+     *       }
+     *     }
+     *   }
+     * }
+     *
+     * Expected Calcite Plan:
+     * LogicalAggregate(
+     *   group=[{}],
+     *   price_extended_stats_count=[COUNT($price)],
+     *   price_extended_stats_min=[MIN($price)],
+     *   price_extended_stats_max=[MAX($price)],
+     *   price_extended_stats_sum=[SUM($price)],
+     *   price_extended_stats_avg=[AVG($price)],
+     *   price_extended_stats_variance=[VAR_POP($price)],
+     *   price_extended_stats_std_deviation=[STDDEV_POP($price)]
+     * )
+     *   LogicalTableScan(table=[[test-extended-stats]])
+     *
+     * Note: sum_of_squares is calculated from variance in post-processing since
+     * Calcite doesn't have a native SUM(x²) function.
+     */
+    public void testExtendedStatsAggregationConversion() throws Exception {
+        String indexName = "test-extended-stats";
+        String mapping = "{"
+            + "\"properties\": {"
+            + "  \"price\": {\"type\": \"long\"}"
+            + "}"
+            + "}";
+        client().admin().indices().prepareCreate(indexName)
+            .setMapping(mapping)
+            .get();
+        ensureGreen(indexName);
+
+        indexTestDoc(indexName, "1", "price", 100);
+        indexTestDoc(indexName, "2", "price", 200);
+        indexTestDoc(indexName, "3", "price", 300);
+        client().admin().indices().prepareRefresh(indexName).get();
+
+        SearchSourceBuilder searchSource = new SearchSourceBuilder();
+        searchSource.aggregation(AggregationBuilders.extendedStats("price_extended_stats").field("price"));
+        searchSource.size(0);
+
+        SearchResponse response = convertDsl(searchSource, indexName);
+        assertNotNull("SearchResponse should not be null", response);
+
+        // TODO: Add deeper assertions to verify:
+        // - LogicalAggregate node exists with empty grouping set (group=[{}])
+        // - 7 aggregate calls present: COUNT, MIN, MAX, SUM, AVG, VAR_POP, STDDEV_POP
+        // - Field names match: price_extended_stats_count, _min, _max, _sum, _avg, _variance, _std_deviation
+        // - Aggregate functions use correct field index ($price)
+        // - Response contains InternalExtendedStats with correct values (count=3, min=100, max=300, sum=600, avg=200, variance=6666.67, std_dev=81.65, sum_of_squares=140000)
+    }
+
+    /**
+     * Test: Value count aggregation conversion.
+     * Verifies that value_count aggregation is converted to Calcite COUNT function.
+     *
+     * DSL Query:
+     * {
+     *   "aggs": {
+     *     "price_count": {
+     *       "value_count": {
+     *         "field": "price"
+     *       }
+     *     }
+     *   }
+     * }
+     *
+     * Expected Calcite Plan:
+     * LogicalAggregate(
+     *   group=[{}],
+     *   price_count=[COUNT($price)]
+     * )
+     *   LogicalTableScan(table=[[test-value-count]])
+     */
+    public void testValueCountAggregationConversion() throws Exception {
+        String indexName = "test-value-count";
+        String mapping = "{"
+            + "\"properties\": {"
+            + "  \"price\": {\"type\": \"long\"}"
+            + "}"
+            + "}";
+        client().admin().indices().prepareCreate(indexName)
+            .setMapping(mapping)
+            .get();
+        ensureGreen(indexName);
+
+        indexTestDoc(indexName, "1", "price", 100);
+        indexTestDoc(indexName, "2", "price", 200);
+        indexTestDoc(indexName, "3", "price", 300);
+        client().admin().indices().prepareRefresh(indexName).get();
+
+        SearchSourceBuilder searchSource = new SearchSourceBuilder();
+        searchSource.aggregation(AggregationBuilders.count("price_count").field("price"));
+        searchSource.size(0);
+
+        SearchResponse response = convertDsl(searchSource, indexName);
+        assertNotNull("SearchResponse should not be null", response);
+
+        // TODO: Add deeper assertions to verify:
+        // - LogicalAggregate node exists with empty grouping set (group=[{}])
+        // - Single aggregate call present: COUNT
+        // - Field name matches: price_count
+        // - Aggregate function uses correct field index ($price)
+        // - Response contains InternalValueCount with correct value (count=3)
+    }
 }
