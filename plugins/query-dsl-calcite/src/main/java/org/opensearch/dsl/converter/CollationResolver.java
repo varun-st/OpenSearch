@@ -31,6 +31,8 @@ import java.util.Map;
  */
 public final class CollationResolver {
 
+    private static final String KEY_FIELD = "_key";
+
     private CollationResolver() {}
 
     /**
@@ -112,16 +114,22 @@ public final class CollationResolver {
             nameToIndex.put(fields.get(i).getName(), i);
         }
 
-        // _key → look up each GROUP BY field name in actual schema
+        // _key → look up each GROUP BY column name in actual schema
         List<Integer> keyIndices = new ArrayList<>();
-        for (String groupByName : metadata.getGroupByFieldNames()) {
-            Integer idx = nameToIndex.get(groupByName);
+        for (String columnName : metadata.getGroupByColumnNames()) {
+            Integer idx = nameToIndex.get(columnName);
             if (idx != null) {
                 keyIndices.add(idx);
-                map.put(groupByName, List.of(idx));
             }
         }
-        map.put("_key", keyIndices);
+        map.put(KEY_FIELD, keyIndices);
+
+        for (String fieldName : metadata.getGroupByFieldNames()) {
+            Integer idx = nameToIndex.get(fieldName);
+            if (idx != null) {
+                map.put(fieldName, List.of(idx));
+            }
+        }
 
         // Metric fields: look up by name in actual schema
         for (String aggName : metadata.getAggregateFieldNames()) {

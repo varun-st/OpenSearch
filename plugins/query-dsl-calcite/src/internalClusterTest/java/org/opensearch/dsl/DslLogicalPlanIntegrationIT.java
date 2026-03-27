@@ -16,6 +16,7 @@ import org.opensearch.search.aggregations.bucket.terms.MultiTermsAggregationBuil
 import org.opensearch.search.aggregations.support.MultiTermsValuesSourceConfig;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
@@ -968,5 +969,100 @@ public class DslLogicalPlanIntegrationIT extends DslLogicalPlanIntegrationTestBa
         // - Field name matches: price_count
         // - Aggregate function uses correct field index ($price)
         // - Response contains InternalValueCount with correct value (count=3)
+    }
+
+    public void testHistogramAggregation() throws Exception {
+        String indexName = "test-histogram";
+        String mapping = "{"
+            + "\"properties\": {"
+            + "  \"price\": {\"type\": \"double\"}"
+            + "}"
+            + "}";
+        client().admin().indices().prepareCreate(indexName)
+            .setMapping(mapping)
+            .get();
+        ensureGreen(indexName);
+
+        for (int i = 0; i < 100; i++) {
+            indexTestDoc(indexName, String.valueOf(i), "price", i * 10.0);
+        }
+        client().admin().indices().prepareRefresh(indexName).get();
+
+        SearchSourceBuilder searchSource = new SearchSourceBuilder();
+        searchSource.aggregation(AggregationBuilders.histogram("price_histogram").field("price").interval(100));
+        searchSource.size(0);
+
+        SearchResponse response = convertDsl(searchSource, indexName);
+        assertNotNull("SearchResponse should not be null", response);
+
+        // TODO: Add deeper assertions to verify:
+        // - LogicalAggregate node with histogram grouping
+        // - HistogramGrouping extracts field, interval, offset correctly
+        // - Expression builds correct FLOOR((field - offset) / interval) * interval + offset
+        // - Response contains InternalHistogram with 10 buckets (0, 100, 200, ..., 900)
+        // - Each bucket has correct doc count (10 docs per bucket)
+    }
+
+    public void testHistogramWithOffset() throws Exception {
+        String indexName = "test-histogram-offset";
+        String mapping = "{"
+            + "\"properties\": {"
+            + "  \"value\": {\"type\": \"double\"}"
+            + "}"
+            + "}";
+        client().admin().indices().prepareCreate(indexName)
+            .setMapping(mapping)
+            .get();
+        ensureGreen(indexName);
+
+        for (int i = 0; i < 50; i++) {
+            indexTestDoc(indexName, String.valueOf(i), "value", i * 5.0);
+        }
+        client().admin().indices().prepareRefresh(indexName).get();
+
+        SearchSourceBuilder searchSource = new SearchSourceBuilder();
+        searchSource.aggregation(AggregationBuilders.histogram("value_histogram").field("value").interval(20).offset(5));
+        searchSource.size(0);
+
+        SearchResponse response = convertDsl(searchSource, indexName);
+        assertNotNull("SearchResponse should not be null", response);
+
+        // TODO: Add deeper assertions to verify:
+        // - HistogramGrouping correctly applies offset parameter
+        // - Expression: FLOOR((value - 5) / 20) * 20 + 5
+        // - Buckets align with offset (5, 25, 45, ...)
+        // - Verify bucket keys and doc counts match expected distribution
+    }
+
+    public void testHistogramWithMinDocCount() throws Exception {
+        String indexName = "test-histogram-mindoc";
+        String mapping = "{"
+            + "\"properties\": {"
+            + "  \"amount\": {\"type\": \"long\"}"
+            + "}"
+            + "}";
+        client().admin().indices().prepareCreate(indexName)
+            .setMapping(mapping)
+            .get();
+        ensureGreen(indexName);
+
+        indexTestDoc(indexName, "1", "amount", 10);
+        indexTestDoc(indexName, "2", "amount", 15);
+        indexTestDoc(indexName, "3", "amount", 50);
+        indexTestDoc(indexName, "4", "amount", 55);
+        indexTestDoc(indexName, "5", "amount", 100);
+        client().admin().indices().prepareRefresh(indexName).get();
+
+        SearchSourceBuilder searchSource = new SearchSourceBuilder();
+        searchSource.aggregation(AggregationBuilders.histogram("amount_histogram").field("amount").interval(10).minDocCount(2));
+        searchSource.size(0);
+
+        SearchResponse response = convertDsl(searchSource, indexName);
+        assertNotNull("SearchResponse should not be null", response);
+
+        // TODO: Add deeper assertions to verify:
+        // - minDocCount filtering applied in AggregationResponseBuilder
+        // - Only buckets with >= 2 docs are returned (10 and 50 buckets)
+        // - HistogramBucketShape handles minDocCount=0 workaround correctly
     }
 }

@@ -146,6 +146,6 @@ task runUnitTests(type: Test) {
     useJUnit()
     
     filter {
-        includeTestsMatching "org.opensearch.dsl.aggregation.metric.*"
+        includeTestsMatching "org.opensearch.dsl.aggregation.*"
     }
 }

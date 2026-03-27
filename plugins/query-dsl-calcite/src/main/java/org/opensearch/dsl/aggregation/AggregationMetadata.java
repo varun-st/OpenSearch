@@ -13,6 +13,7 @@ import org.apache.calcite.util.ImmutableBitSet;
 import org.opensearch.dsl.converter.CollationResolver;
 import org.opensearch.search.aggregations.BucketOrder;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -35,19 +36,22 @@ public final class AggregationMetadata {
     private final List<String> aggregateFieldNames;
     private final List<AggregateCall> aggregateCalls;
     private final List<BucketOrder> bucketOrders;
+    private final List<GroupingInfo> groupings;
 
     AggregationMetadata(
         ImmutableBitSet groupByBitSet,
         List<String> groupByFieldNames,
         List<String> aggregateFieldNames,
         List<AggregateCall> aggregateCalls,
-        List<BucketOrder> bucketOrders
+        List<BucketOrder> bucketOrders,
+        List<GroupingInfo> groupings
     ) {
         this.groupByBitSet = groupByBitSet;
         this.groupByFieldNames = groupByFieldNames;
         this.aggregateFieldNames = aggregateFieldNames;
         this.aggregateCalls = aggregateCalls;
         this.bucketOrders = bucketOrders;
+        this.groupings = groupings;
     }
 
     /** Returns the bit set of GROUP BY column indices. */
@@ -78,5 +82,32 @@ public final class AggregationMetadata {
     /** Returns true if bucket orders are present. */
     public boolean hasBucketOrders() {
         return !bucketOrders.isEmpty();
+    }
+
+    /** Returns the list of grouping info objects. */
+    public List<GroupingInfo> getGroupings() {
+        return groupings;
+    }
+
+    /** Returns true if any grouping is expression-based. */
+    public boolean hasExpressionGrouping() {
+        return groupings.stream().anyMatch(g -> g instanceof ExpressionGrouping);
+    }
+
+    /**
+     * Returns the actual column names used in GROUP BY.
+     * For expression groupings (histogram, date_histogram), returns projected column names.
+     * For field groupings (terms, multi_terms), returns original field names.
+     */
+    public List<String> getGroupByColumnNames() {
+        List<String> columnNames = new ArrayList<>();
+        for (GroupingInfo grouping : groupings) {
+            if (grouping instanceof ExpressionGrouping exprGrouping) {
+                columnNames.add(exprGrouping.getProjectedColumnName());
+            } else {
+                columnNames.addAll(grouping.getFieldNames());
+            }
+        }
+        return columnNames;
     }
 }
