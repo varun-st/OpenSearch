@@ -8,10 +8,13 @@
 
 package org.opensearch.dsl;
 
+import org.opensearch.action.index.IndexRequestBuilder;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.search.aggregations.AggregationBuilders;
 import org.opensearch.search.aggregations.BucketOrder;
+import org.opensearch.search.aggregations.bucket.histogram.DateHistogramInterval;
+import org.opensearch.search.aggregations.bucket.histogram.Histogram;
 import org.opensearch.search.aggregations.bucket.terms.MultiTermsAggregationBuilder;
 import org.opensearch.search.aggregations.support.MultiTermsValuesSourceConfig;
 import org.opensearch.search.builder.SearchSourceBuilder;
@@ -20,6 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.opensearch.search.aggregations.AggregationBuilders.dateHistogram;
+import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
+import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertSearchResponse;
 
 /**
  * Integration tests for DSL to Calcite conversion.
@@ -1064,5 +1070,90 @@ public class DslLogicalPlanIntegrationIT extends DslLogicalPlanIntegrationTestBa
         // - minDocCount filtering applied in AggregationResponseBuilder
         // - Only buckets with >= 2 docs are returned (10 and 50 buckets)
         // - HistogramBucketShape handles minDocCount=0 workaround correctly
+    }
+
+    /**
+     * Tests date_histogram with calendar interval.
+     */
+    public void testDateHistogramCalendarInterval() throws Exception {
+        String indexName = "test-date-histogram";
+        assertAcked(prepareCreate(indexName).setMapping("timestamp", "type=date"));
+
+        List<IndexRequestBuilder> builders = new ArrayList<>();
+        builders.add(client().prepareIndex(indexName).setSource("timestamp", "2024-01-01T00:00:00Z"));
+        builders.add(client().prepareIndex(indexName).setSource("timestamp", "2024-01-15T00:00:00Z"));
+        builders.add(client().prepareIndex(indexName).setSource("timestamp", "2024-02-01T00:00:00Z"));
+        builders.add(client().prepareIndex(indexName).setSource("timestamp", "2024-02-20T00:00:00Z"));
+        builders.add(client().prepareIndex(indexName).setSource("timestamp", "2024-03-10T00:00:00Z"));
+        indexRandom(true, builders);
+
+        SearchSourceBuilder searchSource = new SearchSourceBuilder();
+        searchSource.aggregation(dateHistogram("date_hist").field("timestamp").calendarInterval(DateHistogramInterval.MONTH));
+        searchSource.size(0);
+
+        SearchResponse response = convertDsl(searchSource, indexName);
+        assertNotNull("SearchResponse should not be null", response);
+
+        // TODO: Add deeper assertions to verify:
+        // - LogicalAggregate node with date_histogram grouping
+        // - DateHistogramGrouping extracts field, calendar interval correctly
+        // - Expression builds correct FLOOR(timestamp TO MONTH)
+        // - Response contains InternalDateHistogram with 3 buckets
+        // - Each bucket has correct doc count (2, 2, 1)
+    }
+
+    /**
+     * Tests date_histogram with fixed interval.
+     */
+    public void testDateHistogramFixedInterval() throws Exception {
+        String indexName = "test-date-histogram-fixed";
+        assertAcked(prepareCreate(indexName).setMapping("timestamp", "type=date"));
+
+        List<IndexRequestBuilder> builders = new ArrayList<>();
+        long baseTime = 1704067200000L; // 2024-01-01T00:00:00Z
+        for (int i = 0; i < 10; i++) {
+            builders.add(client().prepareIndex(indexName).setSource("timestamp", baseTime + (i * 3600000L)));
+        }
+        indexRandom(true, builders);
+
+        SearchSourceBuilder searchSource = new SearchSourceBuilder();
+        searchSource.aggregation(dateHistogram("date_hist").field("timestamp").fixedInterval(DateHistogramInterval.hours(2)));
+        searchSource.size(0);
+
+        SearchResponse response = convertDsl(searchSource, indexName);
+        assertNotNull("SearchResponse should not be null", response);
+
+        // TODO: Add deeper assertions to verify:
+        // - LogicalAggregate node with date_histogram grouping
+        // - DateHistogramGrouping extracts field, fixed interval correctly
+        // - Expression builds correct FLOOR(epoch_ms / interval_ms) * interval_ms
+        // - Response contains InternalDateHistogram with 5 buckets
+        // - Each bucket has correct doc count (2)
+    }
+
+    /**
+     * Tests date_histogram with min_doc_count.
+     */
+    public void testDateHistogramWithMinDocCount() throws Exception {
+        String indexName = "test-date-histogram-mindoc";
+        assertAcked(prepareCreate(indexName).setMapping("timestamp", "type=date"));
+
+        List<IndexRequestBuilder> builders = new ArrayList<>();
+        builders.add(client().prepareIndex(indexName).setSource("timestamp", "2024-01-01T00:00:00Z"));
+        builders.add(client().prepareIndex(indexName).setSource("timestamp", "2024-01-01T01:00:00Z"));
+        builders.add(client().prepareIndex(indexName).setSource("timestamp", "2024-01-01T05:00:00Z"));
+        indexRandom(true, builders);
+
+        SearchSourceBuilder searchSource = new SearchSourceBuilder();
+        searchSource.aggregation(dateHistogram("date_hist").field("timestamp").fixedInterval(DateHistogramInterval.hours(1)).minDocCount(2));
+        searchSource.size(0);
+
+        SearchResponse response = convertDsl(searchSource, indexName);
+        assertNotNull("SearchResponse should not be null", response);
+
+        // TODO: Add deeper assertions to verify:
+        // - minDocCount filtering applied in AggregationResponseBuilder
+        // - Only buckets with >= 2 docs are returned
+        // - DateHistogramBucketShape handles minDocCount=0 workaround correctly
     }
 }

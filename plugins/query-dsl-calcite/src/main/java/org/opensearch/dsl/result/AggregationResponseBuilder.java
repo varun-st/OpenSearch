@@ -250,7 +250,6 @@ public final class AggregationResponseBuilder {
                 }
             }
 
-            // Build parent key filter for sub-agg recursion
             Map<String, Object> childKeyFilter = new HashMap<>(parentKeyFilter);
             for (int i = 0; i < bucketFieldNames.size(); i++) {
                 String filterKey = (grouping instanceof ExpressionGrouping exprGrouping)

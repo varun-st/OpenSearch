@@ -8,6 +8,7 @@
 
 package org.opensearch.dsl.aggregation;
 
+import org.opensearch.dsl.aggregation.bucket.DateHistogramBucketShape;
 import org.opensearch.dsl.aggregation.bucket.HistogramBucketShape;
 import org.opensearch.dsl.aggregation.bucket.MultiTermsBucketShape;
 import org.opensearch.dsl.aggregation.bucket.TermsBucketShape;
@@ -33,6 +34,7 @@ public class AggregationRegistryFactory {
         registry.register(new TermsBucketShape());
         registry.register(new MultiTermsBucketShape());
         registry.register(new HistogramBucketShape());
+        registry.register(new DateHistogramBucketShape());
         registry.register(new AvgMetricTranslator());
         registry.register(new SumMetricTranslator());
         registry.register(new MinMetricTranslator());
