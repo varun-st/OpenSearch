@@ -11,6 +11,8 @@ package org.opensearch.dsl.result;
 import org.opensearch.dsl.aggregation.AggregationMetadataBuilder;
 import org.opensearch.dsl.aggregation.AggregationRegistry;
 import org.opensearch.dsl.aggregation.AggregationType;
+import org.opensearch.dsl.aggregation.ExpressionGrouping;
+import org.opensearch.dsl.aggregation.GroupingInfo;
 import org.opensearch.dsl.aggregation.bucket.BucketShape;
 import org.opensearch.dsl.aggregation.metric.CompositeMetricTranslator;
 import org.opensearch.dsl.aggregation.metric.MetricTranslator;
@@ -206,7 +208,8 @@ public final class AggregationResponseBuilder {
             List<String> accumulatedGroupFields,
             Map<String, Object> parentKeyFilter) throws ConversionException {
 
-        List<String> bucketFieldNames = shape.getGrouping(agg).getFieldNames();
+        GroupingInfo grouping = shape.getGrouping(agg);
+        List<String> bucketFieldNames = grouping.getFieldNames();
         List<String> newAccumulatedFields = new ArrayList<>(accumulatedGroupFields);
         newAccumulatedFields.addAll(bucketFieldNames);
 
@@ -218,11 +221,16 @@ public final class AggregationResponseBuilder {
 
         Map<String, Integer> colIndex = buildColumnIndex(result);
 
+        List<String> columnNamesForLookup = bucketFieldNames;
+        if (grouping instanceof ExpressionGrouping exprGrouping) {
+            columnNamesForLookup = List.of(exprGrouping.getProjectedColumnName());
+        }
+
         // Filter rows by parent key
         List<Object[]> filteredRows = filterRows(result.getRows(), colIndex, parentKeyFilter);
 
         // Group filtered rows by this bucket's key columns
-        Map<List<Object>, List<Object[]>> groups = groupByKeys(filteredRows, colIndex, bucketFieldNames);
+        Map<List<Object>, List<Object[]>> groups = groupByKeys(filteredRows, colIndex, columnNamesForLookup);
 
         // Build bucket entries
         Integer countCol = colIndex.get(AggregationMetadataBuilder.IMPLICIT_COUNT_NAME);
@@ -245,7 +253,10 @@ public final class AggregationResponseBuilder {
             // Build parent key filter for sub-agg recursion
             Map<String, Object> childKeyFilter = new HashMap<>(parentKeyFilter);
             for (int i = 0; i < bucketFieldNames.size(); i++) {
-                childKeyFilter.put(bucketFieldNames.get(i), keys.get(i));
+                String filterKey = (grouping instanceof ExpressionGrouping exprGrouping)
+                    ? exprGrouping.getProjectedColumnName()
+                    : bucketFieldNames.get(i);
+                childKeyFilter.put(filterKey, keys.get(i));
             }
 
             // Build sub-aggregations
@@ -258,6 +269,13 @@ public final class AggregationResponseBuilder {
             }
 
             bucketEntries.add(new BucketEntry(keys, docCount, subAggResults));
+        }
+
+        long minDocCount = shape.getMinDocCount(agg);
+        if (minDocCount > 0) {
+            bucketEntries = bucketEntries.stream()
+                .filter(entry -> entry.docCount() >= minDocCount)
+                .toList();
         }
 
         return shape.toBucketAggregation(agg, bucketEntries);

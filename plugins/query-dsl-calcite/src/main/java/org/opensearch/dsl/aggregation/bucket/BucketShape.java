@@ -58,4 +58,15 @@ public interface BucketShape<T extends AggregationBuilder> extends AggregationTy
      * @return the constructed bucket InternalAggregation
      */
     InternalAggregation toBucketAggregation(T agg, List<BucketEntry> buckets);
+
+    /**
+     * Returns the minimum document count threshold for this bucket aggregation.
+     * Buckets with doc_count less than this value are filtered out.
+     *
+     * @param agg the bucket aggregation builder
+     * @return the minimum doc count (default 0 means no filtering)
+     */
+    default long getMinDocCount(T agg) {
+        return 0;
+    }
 }

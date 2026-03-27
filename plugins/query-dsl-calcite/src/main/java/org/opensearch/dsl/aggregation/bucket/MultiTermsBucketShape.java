@@ -8,8 +8,8 @@
 
 package org.opensearch.dsl.aggregation.bucket;
 
-import org.opensearch.dsl.aggregation.FieldGrouping;
 import org.opensearch.dsl.aggregation.GroupingInfo;
+import org.opensearch.dsl.aggregation.SimpleFieldGrouping;
 import org.opensearch.dsl.result.BucketEntry;
 import org.opensearch.search.DocValueFormat;
 import org.opensearch.search.aggregations.AggregationBuilder;
@@ -45,7 +45,7 @@ public class MultiTermsBucketShape implements BucketShape<MultiTermsAggregationB
         for (MultiTermsValuesSourceConfig config : agg.termsConfig()) {
             fields.add(config.getFieldName());
         }
-        return new FieldGrouping(fields);
+        return new SimpleFieldGrouping(fields);
     }
 
     @Override
@@ -56,6 +56,11 @@ public class MultiTermsBucketShape implements BucketShape<MultiTermsAggregationB
     @Override
     public Collection<AggregationBuilder> getSubAggregations(MultiTermsAggregationBuilder agg) {
         return agg.getSubAggregations();
+    }
+
+    @Override
+    public long getMinDocCount(MultiTermsAggregationBuilder agg) {
+        return agg.minDocCount();
     }
 
     @Override

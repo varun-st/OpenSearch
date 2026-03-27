@@ -9,8 +9,8 @@
 package org.opensearch.dsl.aggregation.bucket;
 
 import org.apache.lucene.util.BytesRef;
-import org.opensearch.dsl.aggregation.FieldGrouping;
 import org.opensearch.dsl.aggregation.GroupingInfo;
+import org.opensearch.dsl.aggregation.SimpleFieldGrouping;
 import org.opensearch.dsl.result.BucketEntry;
 import org.opensearch.search.DocValueFormat;
 import org.opensearch.search.aggregations.AggregationBuilder;
@@ -41,7 +41,7 @@ public class TermsBucketShape implements BucketShape<TermsAggregationBuilder> {
 
     @Override
     public GroupingInfo getGrouping(TermsAggregationBuilder agg) {
-        return new FieldGrouping(List.of(agg.field()));
+        return new SimpleFieldGrouping(List.of(agg.field()));
     }
 
     @Override
@@ -52,6 +52,11 @@ public class TermsBucketShape implements BucketShape<TermsAggregationBuilder> {
     @Override
     public Collection<AggregationBuilder> getSubAggregations(TermsAggregationBuilder agg) {
         return agg.getSubAggregations();
+    }
+
+    @Override
+    public long getMinDocCount(TermsAggregationBuilder agg) {
+        return agg.minDocCount();
     }
 
     @Override
