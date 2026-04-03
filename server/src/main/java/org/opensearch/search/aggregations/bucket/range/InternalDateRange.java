@@ -173,7 +173,7 @@ public class InternalDateRange extends InternalRange<InternalDateRange.Bucket, I
         }
     }
 
-    InternalDateRange(
+    public InternalDateRange(
         String name,
         List<InternalDateRange.Bucket> ranges,
         DocValueFormat formatter,

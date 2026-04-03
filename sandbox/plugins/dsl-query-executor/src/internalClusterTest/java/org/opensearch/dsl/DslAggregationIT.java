@@ -189,4 +189,149 @@ public class DslAggregationIT extends DslIntegTestBase {
             .aggregation(dateHistogram("by_hour").field("timestamp").fixedInterval(DateHistogramInterval.hours(1)))
         ));
     }
+
+    public void testRangeAggregation() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.range("price_ranges")
+                .field("price")
+                .addRange(0, 50)
+                .addRange(50, 100)
+                .addRange(100, 200))
+        ));
+    }
+
+    public void testRangeAggregationWithKeys() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.range("price_ranges")
+                .field("price")
+                .addRange("cheap", 0, 50)
+                .addRange("moderate", 50, 100)
+                .addRange("expensive", 100, 200))
+        ));
+    }
+
+    public void testRangeAggregationWithUnboundedRanges() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.range("price_ranges")
+                .field("price")
+                .addUnboundedTo(50)
+                .addRange(50, 100)
+                .addUnboundedFrom(100))
+        ));
+    }
+
+    public void testRangeAggregationWithMetric() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.range("price_ranges")
+                .field("price")
+                .addRange(0, 100)
+                .addRange(100, 200)
+                .subAggregation(AggregationBuilders.avg("avg_rating").field("rating")))
+        ));
+    }
+
+    public void testRangeAggregationKeyed() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.range("price_ranges")
+                .field("price")
+                .addRange("low", 0, 50)
+                .addRange("high", 50, 100)
+                .keyed(true))
+        ));
+    }
+
+    public void testNestedRangeAggregations() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.range("price_ranges")
+                .field("price")
+                .addRange(0, 100)
+                .addRange(100, 200)
+                .subAggregation(AggregationBuilders.range("rating_ranges")
+                    .field("rating")
+                    .addRange(0, 3)
+                    .addRange(3, 5)))
+        ));
+    }
+
+    public void testDateRangeAggregation() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.dateRange("date_ranges")
+                .field("timestamp")
+                .addRange(0, 1000000000000L)
+                .addRange(1000000000000L, 2000000000000L))
+        ));
+    }
+
+    public void testDateRangeAggregationWithKeys() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.dateRange("date_ranges")
+                .field("timestamp")
+                .addRange("old", 0, 1000000000000L)
+                .addRange("recent", 1000000000000L, 2000000000000L))
+        ));
+    }
+
+    public void testDateRangeAggregationWithUnboundedRanges() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.dateRange("date_ranges")
+                .field("timestamp")
+                .addUnboundedTo(1000000000000L)
+                .addRange(1000000000000L, 2000000000000L)
+                .addUnboundedFrom(2000000000000L))
+        ));
+    }
+
+    public void testDateRangeAggregationKeyed() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.dateRange("date_ranges")
+                .field("timestamp")
+                .addRange("before", 0, 1000000000000L)
+                .addRange("after", 1000000000000L, 2000000000000L)
+                .keyed(true))
+        ));
+    }
+
+    public void testDateRangeAggregationWithDateMath() {
+        createTestIndex();
+        // Test with date math expressions
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.dateRange("date_ranges")
+                .field("timestamp")
+                .addRange("now-7d/d", "now/d")
+                .addRange("now/d", "now+1d/d"))
+        ));
+    }
+
+    public void testDateRangeAggregationWithMixedDateFormats() {
+        createTestIndex();
+        // Test mixing date math and epoch milliseconds
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(AggregationBuilders.dateRange("date_ranges")
+                .field("timestamp")
+                .addRange("old", 0, "now-30d/d")
+                .addRange("recent", "now-30d/d", "now/d"))
+        ));
+    }
 }

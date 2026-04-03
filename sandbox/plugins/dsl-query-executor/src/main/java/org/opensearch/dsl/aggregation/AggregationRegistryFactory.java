@@ -9,7 +9,9 @@
 package org.opensearch.dsl.aggregation;
 
 import org.opensearch.dsl.aggregation.bucket.DateHistogramBucketTranslator;
+import org.opensearch.dsl.aggregation.bucket.DateRangeBucketTranslator;
 import org.opensearch.dsl.aggregation.bucket.HistogramBucketTranslator;
+import org.opensearch.dsl.aggregation.bucket.RangeBucketTranslator;
 import org.opensearch.dsl.aggregation.bucket.TermsBucketTranslator;
 import org.opensearch.dsl.aggregation.metric.AvgMetricTranslator;
 import org.opensearch.dsl.aggregation.metric.MaxMetricTranslator;
@@ -33,6 +35,8 @@ public class AggregationRegistryFactory {
         registry.register(new TermsBucketTranslator());
         registry.register(new HistogramBucketTranslator());
         registry.register(new DateHistogramBucketTranslator());
+        registry.register(new RangeBucketTranslator());
+        registry.register(new DateRangeBucketTranslator());
         // TODO: add other aggregation translators
         return registry;
     }
