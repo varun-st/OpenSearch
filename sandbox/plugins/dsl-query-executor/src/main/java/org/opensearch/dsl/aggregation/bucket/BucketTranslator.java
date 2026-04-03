@@ -10,6 +10,7 @@ package org.opensearch.dsl.aggregation.bucket;
 
 import org.opensearch.dsl.aggregation.AggregationType;
 import org.opensearch.dsl.aggregation.GroupingInfo;
+import org.opensearch.dsl.converter.ConversionException;
 import org.opensearch.dsl.result.BucketEntry;
 import org.opensearch.search.aggregations.AggregationBuilder;
 import org.opensearch.search.aggregations.BucketOrder;
@@ -30,7 +31,7 @@ public interface BucketTranslator<T extends AggregationBuilder> extends Aggregat
      * @param agg the bucket aggregation builder
      * @return the grouping info
      */
-    GroupingInfo getGrouping(T agg);
+    GroupingInfo getGrouping(T agg) throws ConversionException;
 
     /**
      * Returns the bucket order for post-aggregation sorting.
