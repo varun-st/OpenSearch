@@ -47,7 +47,7 @@ import java.util.Arrays;
 public class CompositeKey implements Writeable {
     private final Comparable[] values;
 
-    CompositeKey(Comparable... values) {
+    public CompositeKey(Comparable... values) {
         this.values = values;
     }
 

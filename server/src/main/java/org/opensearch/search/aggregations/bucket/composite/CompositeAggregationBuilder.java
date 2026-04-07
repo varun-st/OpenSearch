@@ -213,6 +213,14 @@ public class CompositeAggregationBuilder extends AbstractAggregationBuilder<Comp
     }
 
     /**
+     * Gets the after key for pagination.
+     * @return the after key map, or null if not set
+     */
+    public Map<String, Object> getAfter() {
+        return after;
+    }
+
+    /**
      * The number of composite buckets to return. Defaults to {@code 10}.
      */
     public CompositeAggregationBuilder size(int size) {

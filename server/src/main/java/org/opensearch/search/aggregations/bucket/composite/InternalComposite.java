@@ -75,7 +75,7 @@ public class InternalComposite extends InternalMultiBucketAggregation<InternalCo
 
     private final boolean earlyTerminated;
 
-    InternalComposite(
+    public InternalComposite(
         String name,
         int size,
         List<String> sourceNames,
@@ -346,7 +346,7 @@ public class InternalComposite extends InternalMultiBucketAggregation<InternalCo
         private final transient List<String> sourceNames;
         private final transient List<DocValueFormat> formats;
 
-        InternalBucket(
+        public InternalBucket(
             List<String> sourceNames,
             List<DocValueFormat> formats,
             CompositeKey key,

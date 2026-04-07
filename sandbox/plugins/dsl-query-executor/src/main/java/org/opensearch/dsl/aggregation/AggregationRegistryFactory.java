@@ -8,6 +8,7 @@
 
 package org.opensearch.dsl.aggregation;
 
+import org.opensearch.dsl.aggregation.bucket.CompositeBucketTranslator;
 import org.opensearch.dsl.aggregation.bucket.DateHistogramBucketTranslator;
 import org.opensearch.dsl.aggregation.bucket.DateRangeBucketTranslator;
 import org.opensearch.dsl.aggregation.bucket.HistogramBucketTranslator;
@@ -37,6 +38,7 @@ public class AggregationRegistryFactory {
         registry.register(new DateHistogramBucketTranslator());
         registry.register(new RangeBucketTranslator());
         registry.register(new DateRangeBucketTranslator());
+        registry.register(new CompositeBucketTranslator());
         // TODO: add other aggregation translators
         return registry;
     }
