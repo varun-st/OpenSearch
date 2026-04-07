@@ -107,7 +107,7 @@ public class AggregationMetadataBuilder {
         // Assign them indices starting after existing columns.
         int nextProjectedIndex = inputRowType.getFieldCount();
 
-        for (GroupingInfo g : groupings) {
+        for (GroupingInfo g : GroupingUtils.flatten(groupings)) {
             if (g instanceof ExpressionGrouping expr) {
                 allGroupIndices.add(nextProjectedIndex);
                 nextProjectedIndex++;

@@ -8,10 +8,18 @@
 
 package org.opensearch.dsl;
 
+import org.opensearch.action.search.SearchResponse;
 import org.opensearch.search.aggregations.AggregationBuilders;
+import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
+import org.opensearch.search.aggregations.bucket.composite.HistogramValuesSourceBuilder;
+import org.opensearch.search.aggregations.bucket.composite.InternalComposite;
+import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder;
 import org.opensearch.search.aggregations.bucket.histogram.DateHistogramInterval;
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.opensearch.search.builder.SearchSourceBuilder;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.opensearch.search.aggregations.AggregationBuilders.dateHistogram;
 
@@ -330,8 +338,144 @@ public class DslAggregationIT extends DslIntegTestBase {
             .size(0)
             .aggregation(AggregationBuilders.dateRange("date_ranges")
                 .field("timestamp")
-                .addRange("old", 0, "now-30d/d")
+                .addRange("old", "0", "now-30d/d")
                 .addRange("recent", "now-30d/d", "now/d"))
         ));
+    }
+
+    public void testCompositeAggregation() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(new CompositeAggregationBuilder("composite_agg",
+                List.of(new TermsValuesSourceBuilder("category").field("category")))
+            )
+        ));
+    }
+
+    public void testCompositeAggregationWithMultipleSources() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(new CompositeAggregationBuilder("composite_agg",
+                List.of(
+                    new TermsValuesSourceBuilder("category").field("category"),
+                    new HistogramValuesSourceBuilder("price_bucket").field("price").interval(100)
+                ))
+            )
+        ));
+    }
+
+    public void testCompositeAggregationWithMetric() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(new CompositeAggregationBuilder("composite_agg",
+                List.of(new TermsValuesSourceBuilder("category").field("category")))
+                .subAggregation(AggregationBuilders.avg("avg_price").field("price"))
+            )
+        ));
+    }
+
+    public void testCompositeAggregationWithCustomOrder() {
+        createTestIndex();
+        assertOk(search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(new CompositeAggregationBuilder("composite_agg",
+                List.of(new TermsValuesSourceBuilder("category").field("category")
+                    .order(org.opensearch.search.sort.SortOrder.DESC)))
+            )
+        ));
+    }
+
+    public void testCompositeAggregationPagination() {
+        createTestIndex();
+
+        SearchResponse response1 = search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(new CompositeAggregationBuilder("composite_agg",
+                List.of(new TermsValuesSourceBuilder("category").field("category")))
+                .size(2)
+            )
+        );
+        assertOk(response1);
+
+        InternalComposite composite1 = response1.getAggregations().get("composite_agg");
+        assertNotNull(composite1);
+        assertEquals(2, composite1.getBuckets().size());
+        assertNotNull(composite1.afterKey());
+
+        SearchResponse response2 = search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(new CompositeAggregationBuilder("composite_agg",
+                List.of(new TermsValuesSourceBuilder("category").field("category")))
+                .size(2)
+                .aggregateAfter(composite1.afterKey())
+            )
+        );
+        assertOk(response2);
+
+        InternalComposite composite2 = response2.getAggregations().get("composite_agg");
+        assertNotNull(composite2);
+
+        List<Object> keys1 = composite1.getBuckets().stream()
+            .map(b -> b.getKey().get("category"))
+            .collect(Collectors.toList());
+        List<Object> keys2 = composite2.getBuckets().stream()
+            .map(b -> b.getKey().get("category"))
+            .collect(Collectors.toList());
+
+        for (Object key : keys2) {
+            assertFalse("Duplicate key found: " + key, keys1.contains(key));
+        }
+    }
+
+    public void testCompositeAggregationMultiDimensionalPagination() {
+        createTestIndex();
+
+        SearchResponse response1 = search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(new CompositeAggregationBuilder("composite_agg",
+                List.of(
+                    new TermsValuesSourceBuilder("category").field("category"),
+                    new HistogramValuesSourceBuilder("price_bucket").field("price").interval(100)
+                ))
+                .size(3)
+            )
+        );
+        assertOk(response1);
+
+        InternalComposite composite1 = response1.getAggregations().get("composite_agg");
+        assertNotNull(composite1);
+        assertNotNull(composite1.afterKey());
+        assertTrue(composite1.afterKey().containsKey("category"));
+        assertTrue(composite1.afterKey().containsKey("price_bucket"));
+
+        SearchResponse response2 = search(new SearchSourceBuilder()
+            .size(0)
+            .aggregation(new CompositeAggregationBuilder("composite_agg",
+                List.of(
+                    new TermsValuesSourceBuilder("category").field("category"),
+                    new HistogramValuesSourceBuilder("price_bucket").field("price").interval(100)
+                ))
+                .size(3)
+                .aggregateAfter(composite1.afterKey())
+            )
+        );
+        assertOk(response2);
+
+        InternalComposite composite2 = response2.getAggregations().get("composite_agg");
+        assertNotNull(composite2);
+
+        List<String> keys1 = composite1.getBuckets().stream()
+            .map(b -> b.getKey().get("category") + "|" + b.getKey().get("price_bucket"))
+            .collect(Collectors.toList());
+        List<String> keys2 = composite2.getBuckets().stream()
+            .map(b -> b.getKey().get("category") + "|" + b.getKey().get("price_bucket"))
+            .collect(Collectors.toList());
+
+        for (String key : keys2) {
+            assertFalse("Duplicate composite key found: " + key, keys1.contains(key));
+        }
     }
 }

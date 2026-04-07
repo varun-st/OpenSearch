@@ -10,17 +10,21 @@ package org.opensearch.dsl.converter;
 
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.opensearch.dsl.aggregation.AggregationMetadata;
+import org.opensearch.dsl.aggregation.CompositeGrouping;
 import org.opensearch.dsl.aggregation.ExpressionGrouping;
 import org.opensearch.dsl.aggregation.GroupingInfo;
+import org.opensearch.dsl.aggregation.GroupingUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Creates a {@link LogicalAggregate} from pre-computed {@link AggregationMetadata}.
@@ -47,6 +51,8 @@ public class AggregateConverter {
             planInput = addProjectForExpressions(input, metadata, rexBuilder);
         }
 
+        planInput = addAfterKeyFilter(planInput, metadata, rexBuilder);
+
         return LogicalAggregate.create(
             planInput,
             metadata.getGroupByBitSet(),
@@ -56,7 +62,7 @@ public class AggregateConverter {
     }
 
     private static boolean hasExpressionGrouping(AggregationMetadata metadata) {
-        return metadata.getGroupings().stream().anyMatch(g -> g instanceof ExpressionGrouping);
+        return GroupingUtils.hasExpressionGrouping(metadata.getGroupings());
     }
 
     private static RelNode addProjectForExpressions(RelNode input, AggregationMetadata metadata, RexBuilder rexBuilder)
@@ -70,7 +76,7 @@ public class AggregateConverter {
             fieldNames.add(field.getName());
         }
 
-        for (GroupingInfo grouping : metadata.getGroupings()) {
+        for (GroupingInfo grouping : GroupingUtils.flatten(metadata.getGroupings())) {
             if (grouping instanceof ExpressionGrouping exprGrouping) {
                 RexNode expr = exprGrouping.buildExpression(inputRowType, rexBuilder);
                 projects.add(expr);
@@ -79,5 +85,34 @@ public class AggregateConverter {
         }
 
         return LogicalProject.create(input, List.of(), projects, fieldNames);
+    }
+
+    /**
+     * Adds a filter for composite aggregation cursor-based pagination.
+     * Generates: WHERE (col1 > v1) OR (col1 = v1 AND col2 > v2) OR ...
+     */
+    private static RelNode addAfterKeyFilter(RelNode input, AggregationMetadata metadata, RexBuilder rexBuilder)
+            throws ConversionException {
+        // Composite aggregation has exactly 1 grouping (the CompositeGrouping wrapper),
+        // whereas regular aggregations have multiple groupings (one per bucket level)
+        if (metadata.getGroupings().size() != 1) {
+            return input;
+        }
+
+        GroupingInfo grouping = metadata.getGroupings().get(0);
+        if (!(grouping instanceof CompositeGrouping composite) || !composite.hasAfterKey()) {
+            return input;
+        }
+
+        List<String> sourceNames = composite.getSourceGroupings().stream()
+            .flatMap(g -> g.getFieldNames().stream())
+            .collect(Collectors.toList());
+
+        RexNode filterPredicate = composite.buildAfterKeyFilter(input.getRowType(), rexBuilder, sourceNames);
+        if (filterPredicate == null) {
+            return input;
+        }
+
+        return LogicalFilter.create(input, filterPredicate);
     }
 }
