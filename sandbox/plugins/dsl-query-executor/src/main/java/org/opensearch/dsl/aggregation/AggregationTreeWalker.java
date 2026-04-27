@@ -148,8 +148,14 @@ public class AggregationTreeWalker {
         if (groupings.isEmpty()) {
             return "";
         }
-        return IntStream.range(0, groupings.size())
-            .mapToObj(i -> i + ":" + String.join(",", groupings.get(i).getFieldNames()))
-            .collect(Collectors.joining("|"));
+        List<String> columnNames = new ArrayList<>();
+        for (GroupingInfo g : groupings) {
+            if (g instanceof ExpressionGrouping expr) {
+                columnNames.add(expr.getProjectedColumnName());
+            } else {
+                columnNames.addAll(g.getFieldNames());
+            }
+        }
+        return String.join(",", columnNames);
     }
 }

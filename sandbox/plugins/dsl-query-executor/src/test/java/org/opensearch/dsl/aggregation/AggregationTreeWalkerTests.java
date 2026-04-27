@@ -184,9 +184,12 @@ public class AggregationTreeWalkerTests extends OpenSearchTestCase {
         assertTrue(result.get(1).hasBucketOrders());
     }
 
-    public void testThrowsForUnsupportedAggregation() {
+    public void testSupportsHistogramAggregation() throws ConversionException {
         List<AggregationBuilder> aggs = List.of(new HistogramAggregationBuilder("by_price").field("price").interval(100));
 
-        expectThrows(ConversionException.class, () -> walker.walk(aggs, ctx.getRowType(), ctx.getCluster().getTypeFactory()));
+        List<AggregationMetadata> result = walker.walk(aggs, ctx.getRowType(), ctx.getCluster().getTypeFactory());
+
+        assertEquals(1, result.size());
+        assertEquals(1, result.get(0).getGroupings().size());
     }
 }

@@ -130,7 +130,7 @@ public class SearchSourceConverter {
             );
             for (AggregationMetadata metadata : metadataList) {
                 ConversionContext aggCtx = ctx.withAggregationMetadata(metadata);
-                RelNode aggs = aggConverter.convert(base, metadata);
+                RelNode aggs = aggConverter.convert(base, metadata, cluster.getRexBuilder());
                 aggs = postAggConverter.convert(aggs, aggCtx);
                 builder.add(new QueryPlans.QueryPlan(QueryPlans.Type.AGGREGATION, aggs));
             }

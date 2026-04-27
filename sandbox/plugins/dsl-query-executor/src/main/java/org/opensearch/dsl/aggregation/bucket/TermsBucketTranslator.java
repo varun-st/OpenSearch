@@ -8,8 +8,8 @@
 
 package org.opensearch.dsl.aggregation.bucket;
 
-import org.opensearch.dsl.aggregation.FieldGrouping;
 import org.opensearch.dsl.aggregation.GroupingInfo;
+import org.opensearch.dsl.aggregation.SimpleFieldGrouping;
 import org.opensearch.dsl.result.BucketEntry;
 import org.opensearch.search.aggregations.AggregationBuilder;
 import org.opensearch.search.aggregations.BucketOrder;
@@ -35,7 +35,7 @@ public class TermsBucketTranslator implements BucketTranslator<TermsAggregationB
 
     @Override
     public GroupingInfo getGrouping(TermsAggregationBuilder agg) {
-        return new FieldGrouping(List.of(agg.field()));
+        return new SimpleFieldGrouping(List.of(agg.field()));
     }
 
     @Override

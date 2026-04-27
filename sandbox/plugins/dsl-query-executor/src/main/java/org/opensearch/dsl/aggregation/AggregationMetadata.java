@@ -26,6 +26,7 @@ import java.util.List;
  */
 public class AggregationMetadata {
 
+    private final List<GroupingInfo> groupings;
     private final ImmutableBitSet groupByBitSet;
     private final List<String> groupByFieldNames;
     private final List<AggregateCall> aggregateCalls;
@@ -35,6 +36,7 @@ public class AggregationMetadata {
     /**
      * Creates aggregation metadata.
      *
+     * @param groupings the grouping strategies
      * @param groupByBitSet column indices for GROUP BY
      * @param groupByFieldNames field names for GROUP BY columns
      * @param aggregateCalls Calcite aggregate calls (AVG, SUM, etc.)
@@ -42,17 +44,24 @@ public class AggregationMetadata {
      * @param bucketOrders bucket orders for post-aggregation sorting
      */
     public AggregationMetadata(
+        List<GroupingInfo> groupings,
         ImmutableBitSet groupByBitSet,
         List<String> groupByFieldNames,
         List<AggregateCall> aggregateCalls,
         List<String> aggregateFieldNames,
         List<BucketOrder> bucketOrders
     ) {
+        this.groupings = List.copyOf(groupings);
         this.groupByBitSet = groupByBitSet;
         this.groupByFieldNames = List.copyOf(groupByFieldNames);
         this.aggregateCalls = List.copyOf(aggregateCalls);
         this.aggregateFieldNames = List.copyOf(aggregateFieldNames);
         this.bucketOrders = List.copyOf(bucketOrders);
+    }
+
+    /** Returns the grouping strategies. */
+    public List<GroupingInfo> getGroupings() {
+        return groupings;
     }
 
     /** Returns the GROUP BY column indices. */
