@@ -46,7 +46,7 @@ public class PostAggregateConverterTests extends OpenSearchTestCase {
             scan.getCluster().getTypeFactory()
         );
         ConversionContext aggCtx = ctx.withAggregationMetadata(metadataList.get(0));
-        RelNode agg = aggConverter.convert(scan, metadataList.get(0));
+        RelNode agg = aggConverter.convert(scan, metadataList.get(0), scan.getCluster().getRexBuilder());
 
         RelNode result = postAggConverter.convert(agg, aggCtx);
         assertSame(agg, result);
@@ -62,7 +62,7 @@ public class PostAggregateConverterTests extends OpenSearchTestCase {
             scan.getCluster().getTypeFactory()
         );
         ConversionContext aggCtx = ctx.withAggregationMetadata(metadataList.get(0));
-        RelNode agg = aggConverter.convert(scan, metadataList.get(0));
+        RelNode agg = aggConverter.convert(scan, metadataList.get(0), scan.getCluster().getRexBuilder());
 
         RelNode result = postAggConverter.convert(agg, aggCtx);
         assertTrue(result instanceof LogicalSort);
@@ -92,7 +92,7 @@ public class PostAggregateConverterTests extends OpenSearchTestCase {
             scan.getCluster().getTypeFactory()
         );
         ConversionContext aggCtx = ctx.withAggregationMetadata(metadataList.get(0));
-        RelNode agg = aggConverter.convert(scan, metadataList.get(0));
+        RelNode agg = aggConverter.convert(scan, metadataList.get(0), scan.getCluster().getRexBuilder());
 
         RelNode result = postAggConverter.convert(agg, aggCtx);
         assertTrue(result instanceof LogicalSort);
@@ -119,7 +119,7 @@ public class PostAggregateConverterTests extends OpenSearchTestCase {
             scan.getCluster().getTypeFactory()
         );
         ConversionContext aggCtx = ctx.withAggregationMetadata(metadataList.get(0));
-        RelNode agg = aggConverter.convert(scan, metadataList.get(0));
+        RelNode agg = aggConverter.convert(scan, metadataList.get(0), scan.getCluster().getRexBuilder());
 
         RelNode result = postAggConverter.convert(agg, aggCtx);
         assertTrue(result instanceof LogicalSort);
@@ -144,7 +144,7 @@ public class PostAggregateConverterTests extends OpenSearchTestCase {
             scan.getCluster().getTypeFactory()
         );
         ConversionContext aggCtx = ctx.withAggregationMetadata(metadataList.get(0));
-        RelNode agg = aggConverter.convert(scan, metadataList.get(0));
+        RelNode agg = aggConverter.convert(scan, metadataList.get(0), scan.getCluster().getRexBuilder());
 
         RelNode result = postAggConverter.convert(agg, aggCtx);
         assertTrue(result instanceof LogicalSort);

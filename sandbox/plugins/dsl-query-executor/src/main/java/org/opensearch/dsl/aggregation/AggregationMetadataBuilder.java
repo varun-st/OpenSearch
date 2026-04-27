@@ -103,9 +103,21 @@ public class AggregationMetadataBuilder {
         // Resolve grouping indices at build time
         List<Integer> allGroupIndices = new ArrayList<>();
         List<String> allGroupFieldNames = new ArrayList<>();
+
+        // Expression groupings (histogram, date_histogram) don't exist in input schema yet.
+        // They will be added as computed columns by LogicalProject before LogicalAggregate.
+        // Assign them indices starting after existing columns.
+        int nextProjectedIndex = inputRowType.getFieldCount();
+
         for (GroupingInfo g : groupings) {
-            allGroupIndices.addAll(resolveFieldIndices(g, inputRowType));
-            allGroupFieldNames.addAll(g.getFieldNames());
+            if (g instanceof ExpressionGrouping exprGrouping) {
+                allGroupIndices.add(nextProjectedIndex);
+                nextProjectedIndex++;
+                allGroupFieldNames.add(exprGrouping.getProjectedColumnName());
+            } else {
+                allGroupIndices.addAll(resolveFieldIndices(g, inputRowType));
+                allGroupFieldNames.addAll(g.getFieldNames());
+            }
         }
 
         // For no-GROUP-BY, metric results could be null (e.g., AVG of empty set).
@@ -151,7 +163,7 @@ public class AggregationMetadataBuilder {
             allFieldNames.add(IMPLICIT_COUNT_NAME);
         }
 
-        return new AggregationMetadata(ImmutableBitSet.of(allGroupIndices), allGroupFieldNames, allCalls, allFieldNames, bucketOrders);
+        return new AggregationMetadata(groupings, ImmutableBitSet.of(allGroupIndices), allGroupFieldNames, allCalls, allFieldNames, bucketOrders);
     }
 
     /**

@@ -180,17 +180,17 @@ public final class InternalDateHistogram extends InternalMultiBucketAggregation<
      *
      * @opensearch.internal
      */
-    static class EmptyBucketInfo {
+    public static class EmptyBucketInfo {
 
         final Rounding rounding;
         final InternalAggregations subAggregations;
         final LongBounds bounds;
 
-        EmptyBucketInfo(Rounding rounding, InternalAggregations subAggregations) {
+        public EmptyBucketInfo(Rounding rounding, InternalAggregations subAggregations) {
             this(rounding, subAggregations, null);
         }
 
-        EmptyBucketInfo(Rounding rounding, InternalAggregations subAggregations, LongBounds bounds) {
+        public EmptyBucketInfo(Rounding rounding, InternalAggregations subAggregations, LongBounds bounds) {
             this.rounding = rounding;
             this.subAggregations = subAggregations;
             this.bounds = bounds;
@@ -233,7 +233,7 @@ public final class InternalDateHistogram extends InternalMultiBucketAggregation<
     private final long offset;
     final EmptyBucketInfo emptyBucketInfo;
 
-    InternalDateHistogram(
+    public InternalDateHistogram(
         String name,
         List<Bucket> buckets,
         BucketOrder order,

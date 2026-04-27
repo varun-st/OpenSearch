@@ -38,7 +38,7 @@ public class CollationResolverTests extends OpenSearchTestCase {
         AggregationMetadata metadata = walkAndGetMetadata(
             List.of(new TermsAggregationBuilder("by_brand").field("brand").order(BucketOrder.key(true)))
         );
-        RelNode agg = aggregateConverter.convert(scan, metadata);
+        RelNode agg = aggregateConverter.convert(scan, metadata, scan.getCluster().getRexBuilder());
         List<String> fieldNames = agg.getRowType().getFieldNames();
 
         // Verify post-agg schema: [brand, _count]
@@ -55,7 +55,7 @@ public class CollationResolverTests extends OpenSearchTestCase {
         AggregationMetadata metadata = walkAndGetMetadata(
             List.of(new TermsAggregationBuilder("by_brand").field("brand").order(BucketOrder.key(false)))
         );
-        RelNode agg = aggregateConverter.convert(scan, metadata);
+        RelNode agg = aggregateConverter.convert(scan, metadata, scan.getCluster().getRexBuilder());
         List<String> fieldNames = agg.getRowType().getFieldNames();
 
         assertEquals(List.of("brand", "_count"), fieldNames);
@@ -72,7 +72,7 @@ public class CollationResolverTests extends OpenSearchTestCase {
         AggregationMetadata metadata = walkAndGetMetadata(
             List.of(new TermsAggregationBuilder("by_brand").field("brand").order(BucketOrder.count(false)))
         );
-        RelNode agg = aggregateConverter.convert(scan, metadata);
+        RelNode agg = aggregateConverter.convert(scan, metadata, scan.getCluster().getRexBuilder());
         List<String> fieldNames = agg.getRowType().getFieldNames();
 
         assertEquals(List.of("brand", "_count"), fieldNames);
@@ -91,7 +91,7 @@ public class CollationResolverTests extends OpenSearchTestCase {
         AggregationMetadata metadata = walkAndGetMetadata(
             List.of(new TermsAggregationBuilder("by_brand").field("brand").order(BucketOrder.count(true)))
         );
-        RelNode agg = aggregateConverter.convert(scan, metadata);
+        RelNode agg = aggregateConverter.convert(scan, metadata, scan.getCluster().getRexBuilder());
         List<String> fieldNames = agg.getRowType().getFieldNames();
 
         assertEquals(List.of("brand", "_count"), fieldNames);
@@ -114,7 +114,7 @@ public class CollationResolverTests extends OpenSearchTestCase {
                     .subAggregation(new AvgAggregationBuilder("avg_price").field("price"))
             )
         );
-        RelNode agg = aggregateConverter.convert(scan, metadata);
+        RelNode agg = aggregateConverter.convert(scan, metadata, scan.getCluster().getRexBuilder());
         List<String> fieldNames = agg.getRowType().getFieldNames();
 
         assertEquals(List.of("brand", "avg_price", "_count"), fieldNames);
@@ -131,7 +131,7 @@ public class CollationResolverTests extends OpenSearchTestCase {
     public void testEmptyOrdersReturnEmptyCollations() throws ConversionException {
         // Metric-only agg has no bucket orders
         AggregationMetadata metadata = walkAndGetMetadata(List.of(new AvgAggregationBuilder("avg_price").field("price")));
-        RelNode agg = aggregateConverter.convert(scan, metadata);
+        RelNode agg = aggregateConverter.convert(scan, metadata, scan.getCluster().getRexBuilder());
 
         List<RelFieldCollation> collations = CollationResolver.resolve(metadata, agg.getRowType());
 
@@ -145,7 +145,7 @@ public class CollationResolverTests extends OpenSearchTestCase {
                     .order(BucketOrder.compound(List.of(BucketOrder.count(false), BucketOrder.key(true))))
             )
         );
-        RelNode agg = aggregateConverter.convert(scan, metadata);
+        RelNode agg = aggregateConverter.convert(scan, metadata, scan.getCluster().getRexBuilder());
         List<String> fieldNames = agg.getRowType().getFieldNames();
 
         assertEquals(List.of("brand", "_count"), fieldNames);
@@ -175,7 +175,7 @@ public class CollationResolverTests extends OpenSearchTestCase {
         );
         // Second granularity has both brand and name as group-by fields
         AggregationMetadata nestedMetadata = metadataList.get(1);
-        RelNode agg = aggregateConverter.convert(scan, nestedMetadata);
+        RelNode agg = aggregateConverter.convert(scan, nestedMetadata, scan.getCluster().getRexBuilder());
         List<String> fieldNames = agg.getRowType().getFieldNames();
 
         // ImmutableBitSet orders by input index: name(0) before brand(2)
@@ -195,7 +195,7 @@ public class CollationResolverTests extends OpenSearchTestCase {
         AggregationMetadata metadata = walkAndGetMetadata(
             List.of(new TermsAggregationBuilder("by_brand").field("brand").order(BucketOrder.aggregation("nonexistent_metric", true)))
         );
-        RelNode agg = aggregateConverter.convert(scan, metadata);
+        RelNode agg = aggregateConverter.convert(scan, metadata, scan.getCluster().getRexBuilder());
 
         expectThrows(ConversionException.class, () -> CollationResolver.resolve(metadata, agg.getRowType()));
     }
