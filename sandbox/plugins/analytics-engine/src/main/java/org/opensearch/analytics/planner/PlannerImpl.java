@@ -29,6 +29,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.analytics.planner.rel.OpenSearchDistributionTraitDef;
 import org.opensearch.analytics.planner.rules.OpenSearchAggregateReduceRule;
+import org.opensearch.analytics.planner.rules.OpenSearchExtendedStatsReduceRule;
 import org.opensearch.analytics.planner.rules.OpenSearchStatsReduceRule;
 import org.opensearch.analytics.planner.rules.OpenSearchAggregateRule;
 import org.opensearch.analytics.planner.rules.OpenSearchAggregateSplitRule;
@@ -187,6 +188,7 @@ public class PlannerImpl {
         // so the AVG decomposition rule does not see — and does not need to see — STATS' avg
         // path. Other AVG/STDDEV/VAR aggCalls in the same Aggregate are still picked up.
         builder.addRuleInstance(OpenSearchStatsReduceRule.INSTANCE);
+        builder.addRuleInstance(OpenSearchExtendedStatsReduceRule.INSTANCE);
         builder.addRuleInstance(new OpenSearchAggregateReduceRule());
         HepPlanner planner = new HepPlanner(builder.build());
         if (listener != null) {
