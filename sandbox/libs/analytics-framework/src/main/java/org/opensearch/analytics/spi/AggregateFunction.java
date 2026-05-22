@@ -47,6 +47,11 @@ public enum AggregateFunction {
     // so resolution goes via name lookup in fromNameOrError.
     STATS(Type.STATE_EXPANDING, SqlKind.OTHER),
 
+    // EXTENDED_STATS — superset of STATS adding sum_of_squares, variance/std_deviation
+    // triplets, and a nested std_deviation_bounds struct. Decomposition is handled by
+    // OpenSearchExtendedStatsReduceRule during HEP, same model as STATS.
+    EXTENDED_STATS(Type.STATE_EXPANDING, SqlKind.OTHER),
+
     // Statistical — fixed-size state, multi-pass or running stats. Handled by
     // OpenSearchAggregateReduceRule (once FUNCTIONS_TO_REDUCE is extended to include them)
     // — no intermediateFields here either.
@@ -211,6 +216,7 @@ public enum AggregateFunction {
             case AVG -> SqlStdOperatorTable.AVG;
             case APPROX_COUNT_DISTINCT -> SqlStdOperatorTable.APPROX_COUNT_DISTINCT;
             case STATS -> OpenSearchAggregateOperators.STATS;
+            case EXTENDED_STATS -> OpenSearchAggregateOperators.EXTENDED_STATS;
             default -> throw new IllegalStateException("No SqlAggFunction mapping for: " + this);
         };
     }
